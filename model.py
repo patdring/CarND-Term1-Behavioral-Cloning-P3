@@ -32,6 +32,20 @@ def generator(samples, batch_size):
                     center_angle = float(batch_sample[3])
                     images.append(center_image_YUV)
                     angles.append(center_angle)
+                
+                left_image = cv2.imread('./data/IMG/'+batch_sample[1].split('/')[-1])
+                if left_image is not None:
+                    left_image_YUV = cv2.cvtColor(left_image, cv2.COLOR_BGR2YUV)
+                    left_angle = float(batch_sample[3])
+                    images.append(left_image_YUV)
+                    angles.append(center_angle + 0.2)
+
+                right_image = cv2.imread('./data/IMG/'+batch_sample[2].split('/')[-1])
+                if right_image is not None:
+                    right_image_YUV = cv2.cvtColor(right_image, cv2.COLOR_BGR2YUV)
+                    right_angle = float(batch_sample[3])
+                    images.append(right_image_YUV)
+                    angles.append(center_angle - 0.2)
 
             if len(images) == 0:
                 continue
@@ -43,13 +57,13 @@ def generator(samples, batch_size):
                 augmented_angles.append(angle)
                 augmented_images.append(cv2.flip(image, 1))
                 augmented_angles.append(angle * -1.0)
-
+    
             X_train = np.array(augmented_images)
             y_train = np.array(augmented_angles)
 
             yield shuffle(X_train, y_train)
 
-batch = 128
+batch = 1
 
 model = Sequential()
 model.add(Cropping2D(cropping=((60, 25), (0, 0)), input_shape=(160, 320, 3)))
@@ -76,7 +90,7 @@ model.compile(optimizer='adam', loss='mse')
 
 model.fit_generator(
     generator=generator(train_samples, batch_size=batch),
-    steps_per_epoch=len(train_samples)*2,
+    steps_per_epoch=len(train_samples)*6,
     epochs=3,
     validation_data=generator(validation_samples, batch_size=batch),
     validation_steps=len(validation_samples)
