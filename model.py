@@ -1,100 +1,125 @@
-import csv
 import cv2
 import numpy as np
-import sklearn
-import math
-from sklearn.utils import shuffle
-from sklearn.model_selection import train_test_split
-import tensorflow as tf
+import csv
+import tensorflow
+
 from keras.models import Sequential
-from keras.layers import Conv2D, Cropping2D, Dense, Dropout, Flatten, Lambda, MaxPooling2D
+from keras.layers import Flatten, Dense, Conv2D, ELU
+from keras.layers import Lambda, Dropout, Cropping2D, SpatialDropout2D
 
-samples = []
-with open('./data/driving_log.csv') as csvfile:
-    reader = csv.reader(csvfile)
-    for line in reader:
-        samples.append(line)
+from keras.optimizers import Adam
 
-train_samples, validation_samples = train_test_split(samples, test_size=0.2)
+from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
 
-def generator(samples, batch_size):
-    num_samples = len(samples)
-    while True: # Loop forever so the generator never terminates
-        for offset in range(0, num_samples, batch_size):
-            batch_samples = samples[offset:offset+batch_size]
+def load_driving_log(file):
+    lines = []
+    with open(file) as logfile:
+        reader = csv.reader(logfile)
+        for line in reader:
+            lines.append(line)
+    # skip first line/header
+    return lines[1:]  
 
-            images = []
-            angles = []
-            for batch_sample in batch_samples:
-                center_image = cv2.imread('./data/IMG/'+batch_sample[0].split('/')[-1])
-                if center_image is not None:              
-                    center_image_YUV = cv2.cvtColor(center_image, cv2.COLOR_BGR2YUV)
-                    center_angle = float(batch_sample[3])
-                    images.append(center_image_YUV)
-                    angles.append(center_angle)
-                
-                left_image = cv2.imread('./data/IMG/'+batch_sample[1].split('/')[-1])
-                if left_image is not None:
-                    left_image_YUV = cv2.cvtColor(left_image, cv2.COLOR_BGR2YUV)
-                    left_angle = float(batch_sample[3])
-                    images.append(left_image_YUV)
-                    angles.append(center_angle + 0.2)
+def load_driving_data(log_path, data_path):
+    path = data_path
+    lines = log_path
 
-                right_image = cv2.imread('./data/IMG/'+batch_sample[2].split('/')[-1])
-                if right_image is not None:
-                    right_image_YUV = cv2.cvtColor(right_image, cv2.COLOR_BGR2YUV)
-                    right_angle = float(batch_sample[3])
-                    images.append(right_image_YUV)
-                    angles.append(center_angle - 0.2)
-
-            if len(images) == 0:
-                continue
-
-            augmented_images = []
-            augmented_angles = []
-            for (image, angle) in zip(images, angles):
-                augmented_images.append(image)
-                augmented_angles.append(angle)
-                augmented_images.append(cv2.flip(image, 1))
-                augmented_angles.append(angle * -1.0)
+    shuffle(lines)
     
-            X_train = np.array(augmented_images)
-            y_train = np.array(augmented_angles)
+    images = []
+    angles = []
 
-            yield shuffle(X_train, y_train)
+    for line in lines:
+        for i in range(3):
+            source_path = line[i]
+            filename = source_path.split('/')[-1]
+            curr_path = path+filename
+            image = cv2.imread(curr_path)
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            images.append(image)
+            angle = float(line[3])
 
-batch = 1
+            if i == 0:
+                angles.append(angle)
+
+            if i == 1:
+                angles.append(angle + 0.2)
+
+            if i == 2:
+                angles.append(angle - 0.2)
+
+    augmented_images = []
+    augmented_angles = []
+    
+    for (image, angle) in zip(images, angles):
+        augmented_images.append(image)
+        augmented_angles.append(angle)
+        augmented_images.append(cv2.flip(image, 1))
+        augmented_angles.append(angle * -1.0)
+    
+    X_train = np.array(augmented_images)
+    y_train = np.array(augmented_angles)
+
+    return shuffle(X_train, y_train)
+
+driving_log = load_driving_log('../data/driving_log.csv')
+
+train_samples, valid_samples = train_test_split(driving_log, shuffle=True, test_size=0.2)
+
+X_train, y_train = load_driving_data(train_samples, '../data/IMG/')
+X_valid, y_valid = load_driving_data(valid_samples, '../data/IMG/')
 
 model = Sequential()
-model.add(Cropping2D(cropping=((60, 25), (0, 0)), input_shape=(160, 320, 3)))
-model.add(Lambda(lambda x: (x / 255.0) - 0.5))
-model.add(Conv2D(24, (5, 5), strides=(2, 2), activation='elu'))
-model.add(Dropout(.2))
-model.add(Conv2D(36, (5, 5), strides=(2, 2), activation='elu'))
-model.add(Dropout(.2))
-model.add(Conv2D(48, (5, 5), strides=(2, 2), activation='elu'))
-model.add(Dropout(.2))
-model.add(Conv2D(64, (3, 3), activation='elu'))
-model.add(Dropout(.2))
-model.add(Conv2D(64, (3, 3), activation='elu'))
+model.add(Cropping2D(cropping=((75,35),(0,0)),input_shape=(160,320,3)))
+model.add(Lambda(lambda x: x/255.0-0.5))
+#model.add(Conv2D(24, (5, 5), activation='elu', subsample=(2,2), init='random_normal', padding='same'))
+#model.add(Conv2D(48, (5, 5), activation='elu', subsample=(2,2), init='random_normal', padding='same'))
+#model.add(Conv2D(64, (5, 5), activation='elu', subsample=(2,2), init='random_normal', padding='same'))
+#model.add(Conv2D(64, (3, 3), activation='elu', init='random_normal', padding='same'))
+#model.add(Conv2D(64, (3, 3), activation='elu', init='random_normal', padding='same'))
+#model.add(Flatten())
+#model.add(Dense(100, activation='elu'))
+#model.add(Dense(50, activation='elu'))
+#model.add(Dense(10, activation='elu'))
+#model.add(Dense(1, activation='linear'))
+
+model.add(Conv2D(24, (5, 5), strides=(2, 2), padding='same', activation="elu"))
+model.add(SpatialDropout2D(0.5))
+
+model.add(Conv2D(36, (5, 5), strides=(2, 2), padding='same', activation="elu"))
+model.add(SpatialDropout2D(0.5))
+
+model.add(Conv2D(48, (5, 5), strides=(2, 2), padding='valid', activation="elu"))
+model.add(SpatialDropout2D(0.5))
+
+model.add(Conv2D(64, (3, 3), padding='valid', activation="elu"))
+model.add(SpatialDropout2D(0.5))
+
+model.add(Conv2D(64, (3, 3), padding='valid', activation="elu"))
+model.add(SpatialDropout2D(0.5))
+
 model.add(Flatten())
-model.add(Dense(1000, activation='elu'))
-model.add(Dense(100, activation='elu'))
-model.add(Dense(50, activation='elu'))
-model.add(Dense(10, activation='elu'))
+model.add(Dropout(.5))
+model.add(Dense(1164, activation="elu"))
+model.add(Dropout(.5))
+model.add(Dense(100, activation="elu"))
+model.add(Dropout(.5))
+model.add(Dense(50, activation="elu"))
+model.add(Dropout(.5))
+model.add(Dense(10, activation="elu"))
+model.add(Dropout(.5))
 model.add(Dense(1))
 
-print('Training the model')
+adam = Adam(lr=1e-5)
+model.compile(loss='mse',optimizer=adam,metrics=['accuracy'])
 
-model.compile(optimizer='adam', loss='mse')
+model.summary()
 
-model.fit_generator(
-    generator=generator(train_samples, batch_size=batch),
-    steps_per_epoch=len(train_samples)*6,
-    epochs=3,
-    validation_data=generator(validation_samples, batch_size=batch),
-    validation_steps=len(validation_samples)
-)
+model.fit(X_train, y_train, validation_data=(X_valid, y_valid), batch_size=128, epochs=50, verbose=1)
 
-print('Saved the model')
 model.save('model.h5')
+
+
+
+
