@@ -44,10 +44,10 @@ def load_driving_data(log_path, data_path):
                 angles.append(angle)
 
             if i == 1:
-                angles.append(angle + 0.2)
+                angles.append(angle + 0.25)
 
             if i == 2:
-                angles.append(angle - 0.2)
+                angles.append(angle - 0.25)
 
     augmented_images = []
     augmented_angles = []
@@ -57,7 +57,7 @@ def load_driving_data(log_path, data_path):
         augmented_angles.append(angle)
         augmented_images.append(cv2.flip(image, 1))
         augmented_angles.append(angle * -1.0)
-    
+
     X_train = np.array(augmented_images)
     y_train = np.array(augmented_angles)
 
@@ -71,52 +71,39 @@ X_train, y_train = load_driving_data(train_samples, '../data/IMG/')
 X_valid, y_valid = load_driving_data(valid_samples, '../data/IMG/')
 
 model = Sequential()
-model.add(Cropping2D(cropping=((75,35),(0,0)),input_shape=(160,320,3)))
-model.add(Lambda(lambda x: x/255.0-0.5))
-#model.add(Conv2D(24, (5, 5), activation='elu', subsample=(2,2), init='random_normal', padding='same'))
-#model.add(Conv2D(48, (5, 5), activation='elu', subsample=(2,2), init='random_normal', padding='same'))
-#model.add(Conv2D(64, (5, 5), activation='elu', subsample=(2,2), init='random_normal', padding='same'))
-#model.add(Conv2D(64, (3, 3), activation='elu', init='random_normal', padding='same'))
-#model.add(Conv2D(64, (3, 3), activation='elu', init='random_normal', padding='same'))
-#model.add(Flatten())
-#model.add(Dense(100, activation='elu'))
-#model.add(Dense(50, activation='elu'))
-#model.add(Dense(10, activation='elu'))
-#model.add(Dense(1, activation='linear'))
 
-model.add(Conv2D(24, (5, 5), strides=(2, 2), padding='same', activation="elu"))
-model.add(SpatialDropout2D(0.5))
+# trim image to only see section with road
+model.add(Cropping2D(cropping=((50,20), (0,10)), input_shape=(160,320,3)))
 
-model.add(Conv2D(36, (5, 5), strides=(2, 2), padding='same', activation="elu"))
-model.add(SpatialDropout2D(0.5))
+# Preprocess incoming data, centered around zero with small standard deviation
+model.add(Lambda(lambda x: (x / 255.0) - 0.5))
 
-model.add(Conv2D(48, (5, 5), strides=(2, 2), padding='valid', activation="elu"))
-model.add(SpatialDropout2D(0.5))
+#Nvidia model
+model.add(Conv2D(24, (5, 5), activation="relu", name="conv_1", strides=(2, 2)))
+model.add(Conv2D(36, (5, 5), activation="relu", name="conv_2", strides=(2, 2)))
+model.add(Conv2D(48, (5, 5), activation="relu", name="conv_3", strides=(2, 2)))
+model.add(SpatialDropout2D(.5, dim_ordering='default'))
 
-model.add(Conv2D(64, (3, 3), padding='valid', activation="elu"))
-model.add(SpatialDropout2D(0.5))
-
-model.add(Conv2D(64, (3, 3), padding='valid', activation="elu"))
-model.add(SpatialDropout2D(0.5))
+model.add(Conv2D(64, (3, 3), activation="relu", name="conv_4", strides=(1, 1)))
+model.add(Conv2D(64, (3, 3), activation="relu", name="conv_5", strides=(1, 1)))
 
 model.add(Flatten())
+
+model.add(Dense(1164))
 model.add(Dropout(.5))
-model.add(Dense(1164, activation="elu"))
+model.add(Dense(100, activation='relu'))
 model.add(Dropout(.5))
-model.add(Dense(100, activation="elu"))
+model.add(Dense(50, activation='relu'))
 model.add(Dropout(.5))
-model.add(Dense(50, activation="elu"))
-model.add(Dropout(.5))
-model.add(Dense(10, activation="elu"))
+model.add(Dense(10, activation='relu'))
 model.add(Dropout(.5))
 model.add(Dense(1))
 
-adam = Adam(lr=1e-5)
-model.compile(loss='mse',optimizer=adam,metrics=['accuracy'])
+model.compile(loss='mse', optimizer='adam')
 
 model.summary()
 
-model.fit(X_train, y_train, validation_data=(X_valid, y_valid), batch_size=128, epochs=50, verbose=1)
+model.fit(X_train, y_train, validation_data=(X_valid, y_valid), batch_size=256, epochs=7, verbose=1)
 
 model.save('model.h5')
 
