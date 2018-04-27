@@ -1,16 +1,22 @@
+import matplotlib.pyplot as plt
 import cv2
 import numpy as np
 import csv
 import tensorflow
+import keras
 
 from keras.models import Sequential
-from keras.layers import Flatten, Dense, Conv2D, ELU
+from keras.layers import Flatten, Dense, Conv2D, ELU, Activation
 from keras.layers import Lambda, Dropout, Cropping2D, SpatialDropout2D
 
 from keras.optimizers import Adam
 
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
+
+from keras.utils.vis_utils import plot_model
+from keras import backend as K
+from keras.utils import np_utils
 
 def load_driving_log(file):
     lines = []
@@ -83,7 +89,6 @@ model.add(Conv2D(24, (5, 5), activation="relu", name="conv_1", strides=(2, 2)))
 model.add(Conv2D(36, (5, 5), activation="relu", name="conv_2", strides=(2, 2)))
 model.add(Conv2D(48, (5, 5), activation="relu", name="conv_3", strides=(2, 2)))
 model.add(SpatialDropout2D(.5, dim_ordering='default'))
-
 model.add(Conv2D(64, (3, 3), activation="relu", name="conv_4", strides=(1, 1)))
 model.add(Conv2D(64, (3, 3), activation="relu", name="conv_5", strides=(1, 1)))
 
@@ -99,11 +104,31 @@ model.add(Dense(10, activation='relu'))
 model.add(Dropout(.5))
 model.add(Dense(1))
 
+from kerastoolbox.visu import plot_feature_map
+
+plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
+
 model.compile(loss='mse', optimizer='adam')
 
 model.summary()
 
 model.fit(X_train, y_train, validation_data=(X_valid, y_valid), batch_size=256, epochs=7, verbose=1)
+
+images = X_valid[:3]
+x = plot_feature_map(model, X=images, layer_id=3, n_columns=3, n=256)
+plt.show(x)
+x = plot_feature_map(model, X=images, layer_id=4, n_columns=3, n=256)
+plt.show(x)
+x = plot_feature_map(model, X=images, layer_id=5, n_columns=3, n=256)
+plt.show(x)
+x = plot_feature_map(model, X=images, layer_id=6, n_columns=3, n=256)
+plt.show(x)
+
+from kerastoolbox.visu import plot_weights
+x = plot_weights(model, layer_id=6, n=256, ax=None)
+plt.show(x)
+
+plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
 
 model.save('model.h5')
 

@@ -29,6 +29,11 @@ The goals / steps of this project are the following:
 ## Rubric Points
 ### Here I will consider the [rubric points](https://review.udacity.com/#!/rubrics/432/view) individually and describe how I addressed each point in my implementation.  
 
+Updated Keras to Version 2.0.3 via pip
+Zipped model.h5 beacause of git upload limit of 100MB 
+pip install pydot and install graphviz for keras model visualization
+pip install keras-toolbox
+
 ---
 ### Files Submitted & Code Quality
 
