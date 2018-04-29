@@ -59,7 +59,7 @@ image = cv2.imread('./pics/center_2016_12_01_13_42_42_686.jpg')
 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 images.append(image)
 
-image = cv2.imread('./pics/center_2016_12_01_13_45_31_341.jpg')
+image = cv2.imread('./pics/right_2016_12_01_13_32_52_652.jpg')
 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 images.append(image)
 
